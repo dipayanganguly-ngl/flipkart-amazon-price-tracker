@@ -2,10 +2,10 @@ import os, requests
 from supabase import create_client
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = create_client("https://lporzksrbiyznzguqean.supabase.co", SUPABASE_KEY)
 
 def send_message(chat_id, text):
     try:
