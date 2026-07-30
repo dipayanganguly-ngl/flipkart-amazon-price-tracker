@@ -1,16 +1,21 @@
-import os, requests
+import os, requests, sys
 from supabase import create_client
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-supabase = create_client("https://lporzksrbiyznzguqean.supabase.co", SUPABASE_KEY)
+print(f"Token: {TELEGRAM_TOKEN[:10]}...", flush=True)
+print(f"Supabase URL: {SUPABASE_URL}", flush=True)
 
 def send_message(chat_id, text):
     try:
-        requests.post(f"{API}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}, timeout=10)
-    except: pass
+        r = requests.post(f"{API}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}, timeout=10)
+        print(f"Sent to {chat_id}: {r.status_code}", flush=True)
+    except Exception as e:
+        print(f"Send error: {e}", flush=True)
 
 def detect_site(url):
     u = url.lower()
@@ -23,7 +28,10 @@ try:
     with open("offset.txt") as f: offset = int(f.read().strip())
 except: pass
 
+print(f"Offset: {offset}", flush=True)
+
 resp = requests.get(f"{API}/getUpdates?offset={offset}&timeout=5").json()
+print(f"Updates: {resp.get('ok')}, Results: {len(resp.get('result', []))}", flush=True)
 
 if resp.get("ok"):
     for upd in resp["result"]:
@@ -32,6 +40,7 @@ if resp.get("ok"):
         msg = upd["message"]
         chat_id = msg["chat"]["id"]
         text = msg["text"]
+        print(f"Message from {chat_id}: {text}", flush=True)
 
         if text.startswith("/start"):
             send_message(chat_id, "🏢 *ALPHA BOTS Price Tracker*\n\n📊 Track Amazon & Flipkart prices\n🔔 Get alerts when price drops\n\n*/add <url> <price>* - Track product\n*/list* - Your trackers\n*/remove <id>* - Delete tracker")
@@ -63,3 +72,4 @@ if resp.get("ok"):
             except: send_message(chat_id, "❌ Usage: `/remove <id>`")
 
 with open("offset.txt", "w") as f: f.write(str(offset))
+print(f"Done. New offset: {offset}", flush=True)
