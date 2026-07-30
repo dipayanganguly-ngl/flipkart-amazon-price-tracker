@@ -3,15 +3,10 @@ from bs4 import BeautifulSoup
 from supabase import create_client
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
-
-# Use direct IP to avoid DNS issues on GitHub Actions
-supabase = create_client(
-    "https://lporzksrbiyznzguqean.supabase.co",
-    SUPABASE_KEY,
-    headers={"Host": "lporzksrbiyznzguqean.supabase.co"}
-)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 UA = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
