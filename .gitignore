@@ -2,3 +2,4 @@ deploy.sh
 worker.js
 flipkart.html
 *.log
+deploy.sh
