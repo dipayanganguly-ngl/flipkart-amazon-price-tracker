@@ -1,18 +1,21 @@
-import os, requests, time
+import os, requests, time, socket
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# Force IPv4
+import urllib3
+urllib3.util.connection.HAS_IPV6 = False
+
 API = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 def send_message(chat_id, text):
-    for i in range(3):
-        try:
-            r = requests.post(f"{API}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}, timeout=30)
-            if r.status_code == 200: return
-        except Exception as e:
-            print(f"Send attempt {i+1} failed: {e}")
-            time.sleep(2)
+    try:
+        r = requests.post(f"{API}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}, timeout=30)
+        print(f"Send status: {r.status_code}")
+    except Exception as e:
+        print(f"Send error: {e}")
 
 offset = 0
 try:
@@ -22,18 +25,17 @@ except: pass
 
 print(f"Offset: {offset}")
 
-# Try multiple times to reach Telegram
-resp = None
-for attempt in range(3):
-    try:
-        r = requests.get(f"{API}/getUpdates?offset={offset}&timeout=15", timeout=30)
-        resp = r.json()
-        print(f"Attempt {attempt+1}: ok={resp.get('ok')}, updates={len(resp.get('result',[]))}")
-        if resp.get("ok"):
-            break
-    except Exception as e:
-        print(f"Attempt {attempt+1} error: {e}")
-        time.sleep(3)
+# Direct request to Telegram
+try:
+    session = requests.Session()
+    session.mount("https://", requests.adapters.HTTPAdapter())
+    r = session.get(f"{API}/getUpdates?offset={offset}&timeout=10", timeout=30)
+    print(f"Status: {r.status_code}")
+    resp = r.json()
+    print(f"OK: {resp.get('ok')}, Updates: {len(resp.get('result',[]))}")
+except Exception as e:
+    print(f"Error: {e}")
+    resp = None
 
 if resp and resp.get("ok"):
     for upd in resp["result"]:
@@ -43,7 +45,6 @@ if resp and resp.get("ok"):
         msg = upd["message"]
         chat_id = msg["chat"]["id"]
         text = msg["text"]
-        print(f"Processing: {text}")
 
         if text.startswith("/start"):
             send_message(chat_id, "🏢 *ALPHA BOTS Price Tracker*\n\n📊 Track Amazon & Flipkart prices\n\n*/add <url> <price>* - Track\n*/list* - Trackers\n*/remove <id>* - Delete")
@@ -60,7 +61,7 @@ if resp and resp.get("ok"):
                     requests.post(f"{SUPABASE_URL}/rest/v1/trackers", headers=headers, json={"chat_id": str(chat_id), "url": url, "target_price": target, "site": site, "product_name": "Product"})
                     send_message(chat_id, f"✅ *Tracker Added!*\n💰 Target: ₹{target}")
                 except:
-                    send_message(chat_id, "❌ Error adding tracker")
+                    send_message(chat_id, "❌ Error")
         elif text.startswith("/list"):
             try:
                 headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
@@ -71,19 +72,18 @@ if resp and resp.get("ok"):
                 else:
                     msg = "📊 *Trackers*\n\n"
                     for t in items:
-                        msg += f"🆔 `{t['id']}` | {t['site'].upper()} | ₹{t['target_price']}\n"
+                        msg += f"🆔 {t['id']} | {t['site'].upper()} | ₹{t['target_price']}\n"
                     send_message(chat_id, msg)
             except:
-                send_message(chat_id, "❌ Error listing")
+                pass
         elif text.startswith("/remove"):
             try:
                 tid = int(text.split()[1])
                 headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
                 requests.delete(f"{SUPABASE_URL}/rest/v1/trackers?id=eq.{tid}&chat_id=eq.{chat_id}", headers=headers)
-                send_message(chat_id, f"✅ `{tid}` removed!")
+                send_message(chat_id, f"✅ Removed")
             except:
-                send_message(chat_id, "❌ Usage: `/remove <id>`")
+                pass
 
 with open("offset.txt", "w") as f:
     f.write(str(offset))
-print(f"Done. Offset: {offset}")
